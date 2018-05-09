@@ -148,8 +148,23 @@ def main():
         # We only return None in the second position in the tuple if the test passed.
         if res[1] != None:
             fails += 1
-            
+
     print_results(len(result) - fails, fails)
 
 if __name__ == '__main__':
     main()
+
+# the following goes in the makefile but I'm lazy asf
+# .PHONY: test
+# test:
+# ifdef CONCURRENCY
+
+# 	all_files="" ; for f in build/test/*_test; do \
+# 		all_files="$${all_files} $${f}" ; \
+# 	done; \
+# 	python3 parallelize.py $$all_files -c $(CONCURRENCY); 
+# else
+# 	for f in build/test/*_test; do \
+# 		$$f --gtest_output="xml:./$$f.xml"; \
+# 	done
+# endif
