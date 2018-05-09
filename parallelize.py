@@ -78,10 +78,10 @@ def run_test(test_args, verbose):
         return out, err
 
 def run_test_terse(test_args):
-    run_test(test_args, False)
+    return run_test(test_args, False)
 
 def run_test_verbose(test_args):
-    run_test(test_args, True)
+    return run_test(test_args, True)
 
 def parse_input():
 
@@ -127,7 +127,6 @@ def main():
         result = pool.map(test_runner, arg_lists)
 
     fails = 0
-    print(result)
     for res in result:
         # We only return None in the second position in the tuple if the test passed.
         if res[1] != None:
