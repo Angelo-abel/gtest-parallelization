@@ -99,6 +99,19 @@ def parse_input():
 
     return parser.parse_args()
 
+def print_results(num_passing, num_failing):
+    num_pass = str(num_passing)
+    num_fail = str(num_failing)
+    total = str(num_passing + num_failing)
+    
+    output = YELLOW + '|>>> Out of ' + total + ' case(s), ' + GREEN + num_pass + ' passed' + YELLOW + ' and ' + RED + num_fail + ' failed' + YELLOW + '! <<<|' + RESET
+    output_len = len(output) - len(YELLOW) * 3 - len(GREEN) - len(RED) - len(RESET)
+    outer = YELLOW + '|' + ('=' * (output_len - 2)) + '|' + RESET
+
+    global_lock.acquire()
+    print(outer, output, outer, sep='\n')
+    global_lock.release()
+
 def main():
     arg_dict = vars(parse_input())
     gtest_filter = arg_dict['gtest_filter']
@@ -135,20 +148,8 @@ def main():
         # We only return None in the second position in the tuple if the test passed.
         if res[1] != None:
             fails += 1
-
-    total_cases = str(len(result))
-    passing_cases = str(len(result) - fails)
-    failing_cases = str(fails)
-
-    output = YELLOW + '|>>> Out of ' + total_cases + ' case(s), ' + GREEN + passing_cases + ' passed' + YELLOW + ' and ' + RED + failing_cases + ' failed' + YELLOW + '! <<<|' + RESET
-    output_len = len(output) - len(YELLOW) * 3 - len(GREEN) - len(RED) - len(RESET)
-    outer = YELLOW + '|' + ('=' * (output_len - 2)) + '|' + RESET
-
-    global_lock.acquire()
-    print(outer)
-    print(output)
-    print(outer)
-    global_lock.release()
+            
+    print_results(len(result) - fails, fails)
 
 if __name__ == '__main__':
     main()
