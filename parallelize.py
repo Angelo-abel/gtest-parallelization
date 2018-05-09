@@ -27,13 +27,11 @@ def colorize(s):
     
     return s
 
-def run_test(test_args):
+def run_test(test_args, verbose):
     res = subprocess.Popen(test_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = res.communicate()
 
-    out_text = out.decode('utf-8').strip().split('\n')
-
-    # out_text = [colorize(s) for s in out_text]
+    out_text = out.decode('utf-8').split('\n')
 
     # This is the case when the test case dies early
     if len(out_text) < 8:
@@ -54,8 +52,13 @@ def run_test(test_args):
 
         return out, err
     
-    test_name = out_text[1][27:]
-    if out_text[7].startswith(GREEN + '[       OK ]'):
+    test_name = out_text[1][out_text[1].index('=') + 2:]
+    if 'OK' in out_text[7]:
+        if verbose: 
+            global_lock.acquire()
+            print(colorize(out.decode('utf-8').strip()))
+            global_lock.release()
+
         return out, None
     else:
         global_lock.acquire()
@@ -74,51 +77,74 @@ def run_test(test_args):
         
         return out, err
 
-parser = argparse.ArgumentParser(description='Utility script for running GTEST binaries in parallel.')
+def run_test_terse(test_args):
+    run_test(test_args, False)
 
-parser.add_argument('--concurrency', default='1', type=int)
-parser.add_argument('--gtest_binary', required=True, metavar='GTEST Binary Name')
-parser.add_argument('--gtest_filter', metavar='GTEST Regex Filter')
-parser.add_argument('--gtest_args', metavar='GTEST Test Arguments')
+def run_test_verbose(test_args):
+    run_test(test_args, True)
 
-args = parser.parse_args()
-arg_dict = vars(args)
+def parse_input():
 
-# run command to fetch stdout
-res = subprocess.run(['./' + arg_dict['gtest_binary'], '--gtest_filter=' + arg_dict['gtest_filter'],  '--gtest_list_tests'], stdout=subprocess.PIPE)
+    parser = argparse.ArgumentParser(description='Utility script for running GTEST binaries in parallel.')
 
-gtest_listing_string = res.stdout.decode('utf-8')
+    parser.add_argument('GTEST Binaries', type=argparse.FileType(), nargs='+', help='Give a space delimited list of relative filenames of the test-binaries to run.')
+    parser.add_argument('-f','--gtest_filter', default='*', help='Filter to use to determine which unit tests to run')
+    parser.add_argument('-a', '--gtest_args', default='', help='Pass in a string of other commandline arguments to be forwarded to the GTEST binary.')
+    parser.add_argument('-c ', '--concurrency', type=int, default='1', help='How many concurrent unit tests to run')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Specify this flag if you want output for all arguments instead of just failing tests.')
 
-gtest_listings = gtest_listing_string.split('\n')[1:-1]
-tests = []
+    return parser.parse_args()
 
-currentTest = ''
-for test in gtest_listings:
-    test = test.strip()
-    if test[-1] == '.':
-        currentTest = test
-    else:
-        tests.append(currentTest + test)
+def main():
+    arg_dict = vars(parse_input())
+    gtest_filter = arg_dict['gtest_filter']
+    concurrency = arg_dict['concurrency']
+    gtest_args = arg_dict['gtest_args'].split(' ')
+    verbose = arg_dict['verbose']
 
-concurrency = min(len(tests), arg_dict['concurrency'])
+    test_names = {}
+    for f in arg_dict['GTEST Binaries']:
+        test_names[f.name] = []
 
-arg_lists = []
-for i in range(len(tests)):
-    arg_lists.append(['./' + arg_dict['gtest_binary'], '--gtest_filter=' + tests[i], *arg_dict['gtest_args'].split(' ')])
+        res = subprocess.run(['./' + f.name, '--gtest_filter=' + gtest_filter, '--gtest_list_tests'], stdout=subprocess.PIPE)
+        res_listing = [test_name.strip() for test_name in res.stdout.decode('utf-8').split('\n')[1:-1]]
 
-pool = Pool(processes=concurrency)
-result = pool.map(run_test, arg_lists)
+        current_test = ''
+        for test_name in res_listing:
+            if test_name[-1] == '.':
+                current_test = test_name
+            else:
+                test_names[f.name].append(current_test + test_name)
 
-fails = 0
-for res in result:
-    if res[1] != None:
-        fails += 1
+    arg_lists = []
+    for file_name in test_names:
+        for test_name in test_names[file_name]:
+            arg_lists.append(['./' + file_name, '--gtest_filter=' + test_name, *gtest_args])
 
-output = '|>>>' + YELLOW + 'We ran ' + str(len(result)) + ' test cases, ' + GREEN + 'passing ' + str(len(result) - fails) + ' test case(s) ' + RESET + 'and ' + RED + 'failing ' + str(fails) + ' test case(s)!' + RESET + '<<<|'
-outer = '|' + ('=' * (len(output) - 2 - 5 * 5)) + '|'
+    test_runner = run_test_verbose if verbose else run_test_terse
 
-global_lock.acquire()
-print(outer)
-print(output)
-print(outer)
-global_lock.release()
+    with Pool(processes=concurrency) as pool:
+        result = pool.map(test_runner, arg_lists)
+
+    fails = 0
+    print(result)
+    for res in result:
+        # We only return None in the second position in the tuple if the test passed.
+        if res[1] != None:
+            fails += 1
+
+    total_cases = str(len(result))
+    passing_cases = str(len(result) - fails)
+    failing_cases = str(fails)
+
+    output = YELLOW + '|>>> We ' + GREEN + 'passed ' + passing_cases + '/' + total_cases + YELLOW + ' test case(s), ' + RED + 'failing ' + failing_cases + YELLOW + ' test case(s)!<<<|' + RESET
+    outer = '|' + ('=' * (len(output) - 2 - 6 * 6)) + '|'
+
+    global_lock.acquire()
+    print(outer)
+    print(output)
+    print(outer)
+    global_lock.release()
+
+if __name__ == '__main__':
+    main()
