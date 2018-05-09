@@ -28,54 +28,58 @@ def colorize(s):
     return s
 
 def run_test(test_args, verbose):
+    segfault_text = 'FAILING TEST CASE DETECTED: POSSIBLE SEGFAULT!'
+    invalid_text = 'FAILING TEST CASE DETECTED: INVALID VALUE!'
+    output_text = 'Printing out stdout followed by stderr'
+
+    segfault_spaces = ' ' * int((len(segfault_text) - len(output_text)) / 2)
+    invalid_spaces = ' ' * int((len(invalid_text) - len(output_text)) / 2)
+
+    arrow_count = 50
+
     res = subprocess.Popen(test_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = res.communicate()
 
-    out_text = out.decode('utf-8').split('\n')
+    out_text = out.decode('utf-8').strip().split('\n')
 
     # This is the case when the test case dies early
-    if len(out_text) < 8:
-
+    if '[ RUN      ]' in out_text[-1]:
         global_lock.acquire()
-        print(RED, '|==================================================|', RESET, sep='')
-        print(RED, '|>>>FAILING TEST CASE DETECTED-- LIKELY SEGFAULT<<<|', RESET, sep='')
-        print(RED, '|==================================================|', RESET, sep='')
-        print(RED, '|>>>Printing out GTEST output followed by stderr<<<|', RESET, sep='')
-        print(RED, '|==================================================|', RESET, sep='')
-        print(YELLOW, '▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼', RESET, sep='')
+        print(RED, '|====' + ('=' * len(segfault_text)) + '====|', RESET, sep='')
+        print(RED, '|>>> ' + segfault_text + ' <<<|', RESET, sep='')
+        print(RED, '|>>> ' + segfault_spaces + output_text + segfault_spaces + ' <<<|', RESET, sep='')
+        print(RED, '|====' + ('=' * len(segfault_text)) + '====|', RESET, sep='')
+        print(YELLOW, '▼' * arrow_count, RESET, sep='')
         print(colorize(out.decode('utf-8').strip()))
-        print(YELLOW, '▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲', RESET, sep='')
-        print(YELLOW, '▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼', RESET, sep='')
+        print(YELLOW, '▲' * arrow_count, RESET, sep='')
+        print(YELLOW, '▼' * arrow_count, RESET, sep='')
         print(colorize(err.decode('utf-8').strip()))
-        print(YELLOW, '▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲', RESET, sep='')
+        print(YELLOW, '▲' * arrow_count, RESET, sep='')
         global_lock.release()
 
         return out, err
     
-    test_name = out_text[1][out_text[1].index('=') + 2:]
-    if 'OK' in out_text[7]:
+    if True in ['[       OK ]' in line for line in out_text]:
         if verbose: 
             global_lock.acquire()
             print(colorize(out.decode('utf-8').strip()))
             global_lock.release()
 
         return out, None
-    else:
-        global_lock.acquire()
-        print(RED, '|==================================================|', RESET, sep='')
-        print(RED, '|>>> FAILING TEST CASE DETECTED-- INVALID VALUE <<<|', RESET, sep='')
-        print(RED, '|==================================================|', RESET, sep='')
-        print(RED, '|>>>Printing out GTEST output followed by stderr<<<|', RESET, sep='')
-        print(RED, '|==================================================|', RESET, sep='')
-        print(YELLOW, '▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼', RESET, sep='')
-        print(colorize(out.decode('utf-8').strip()))
-        print(YELLOW, '▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲', RESET, sep='')
-        print(YELLOW, '▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼', RESET, sep='')
-        print(colorize(err.decode('utf-8').strip()))
-        print(YELLOW, '▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲', RESET, sep='')
-        global_lock.release()
         
-        return out, err
+    global_lock.acquire()
+    print(RED, '|====' + ('=' * len(invalid_text)) + '====|', RESET, sep='')
+    print(RED, '|>>> ' + invalid_text + ' <<<|', RESET, sep='')
+    print(RED, '|>>> ' + invalid_spaces + output_text + invalid_spaces + ' <<<|', RESET, sep='')
+    print(RED, '|====' + '=' * len(invalid_text) + '====|', RESET, sep='')
+    print(YELLOW, '▼' * arrow_count, RESET, sep='')
+    print(colorize(out.decode('utf-8').strip()))
+    print(YELLOW, '▼' * arrow_count, RESET, sep='')
+    print(colorize(err.decode('utf-8').strip()))        
+    print(YELLOW, '▲' * arrow_count, RESET, sep='')
+    global_lock.release()
+    
+    return out, err
 
 def run_test_terse(test_args):
     return run_test(test_args, False)
@@ -136,8 +140,9 @@ def main():
     passing_cases = str(len(result) - fails)
     failing_cases = str(fails)
 
-    output = YELLOW + '|>>> We ' + GREEN + 'passed ' + passing_cases + '/' + total_cases + YELLOW + ' test case(s), ' + RED + 'failing ' + failing_cases + YELLOW + ' test case(s)!<<<|' + RESET
-    outer = '|' + ('=' * (len(output) - 2 - 6 * 6)) + '|'
+    output = YELLOW + '|>>> Out of ' + total_cases + ' case(s), ' + GREEN + passing_cases + ' passed' + YELLOW + ' and ' + RED + failing_cases + ' failed' + YELLOW + '! <<<|' + RESET
+    output_len = len(output) - len(YELLOW) * 3 - len(GREEN) - len(RED) - len(RESET)
+    outer = YELLOW + '|' + ('=' * (output_len - 2)) + '|' + RESET
 
     global_lock.acquire()
     print(outer)
